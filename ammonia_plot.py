@@ -1,8 +1,17 @@
 """
 Ammonia Synthesis — All Plots
 Chapter 1: Fe Catalyst, Temkin-Dyson-Simon Model
+
+FIXES applied vs original:
+  1. Output folder is now a local 'plots_output' folder beside this script
+     (original used /mnt/user-data/outputs/ which is a Linux-only path)
+  2. AutoMinorLocator removed from log-scale y-axis in plot_arrhenius()
+     and dashboard panel A (matplotlib raises UserWarning and ignores it)
+  3. style_ax() now accepts an optional log_y flag to skip minor locator
+     on logarithmic axes
 """
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -12,6 +21,18 @@ from ammonia_kinetics import (
     rate_vs_temperature, equilibrium_conversion,
     R, k0, Ea, alpha, P_bar
 )
+
+# ─────────────────────────────────────────────
+# OUTPUT FOLDER — saves plots beside this script
+# ─────────────────────────────────────────────
+
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'plots_output')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def out(filename):
+    """Return full path for a plot file inside OUTPUT_DIR."""
+    return os.path.join(OUTPUT_DIR, filename)
+
 
 # ─────────────────────────────────────────────
 # STYLE SETUP
@@ -47,12 +68,20 @@ ACCENT = '#4fc3f7'
 T_RANGE = np.linspace(548, 773, 300)   # K (experimental range from paper)
 
 
-def style_ax(ax, title, xlabel, ylabel):
+def style_ax(ax, title, xlabel, ylabel, log_y=False):
+    """
+    Apply consistent styling to an axes object.
+    Set log_y=True when the y-axis is logarithmic — this skips
+    AutoMinorLocator on y (which doesn't work on log scales).
+    """
     ax.set_title(title, pad=10, fontweight='bold')
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    # x minor ticks are always safe
     ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    # y minor ticks only on linear axes
+    if not log_y:
+        ax.yaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(which='minor', length=3, color='#2e3650')
 
 
@@ -80,14 +109,16 @@ def plot_arrhenius():
                     fontsize=8, color='#c8d0e0',
                     arrowprops=dict(arrowstyle='->', color='#4a5568'))
 
+    # log_y=True — skips AutoMinorLocator on the log y-axis
     style_ax(ax,
              f'Rate Constant vs Temperature (Arrhenius)\nk₀={k0:.2e}, Eₐ={Ea/1000:.1f} kJ/mol, α={alpha}',
              'Temperature (K)',
-             'Rate Constant k (kmol/m³/h)')
+             'Rate Constant k (kmol/m³/h)',
+             log_y=True)
 
     ax.set_xlim(540, 785)
     plt.tight_layout()
-    plt.savefig('/mnt/user-data/outputs/plot1_arrhenius.png', dpi=150,
+    plt.savefig(out('plot1_arrhenius.png'), dpi=150,
                 bbox_inches='tight', facecolor='#0f1117')
     plt.close()
     print("  ✓ Plot 1 saved: Arrhenius")
@@ -120,7 +151,7 @@ def plot_rate_vs_temp():
     ax.set_xlim(540, 785)
     ax.legend()
     plt.tight_layout()
-    plt.savefig('/mnt/user-data/outputs/plot2_rate_vs_temp.png', dpi=150,
+    plt.savefig(out('plot2_rate_vs_temp.png'), dpi=150,
                 bbox_inches='tight', facecolor='#0f1117')
     plt.close()
     print("  ✓ Plot 2 saved: Rate vs Temperature")
@@ -154,7 +185,7 @@ def plot_conversion_profile():
 
     ax.legend(loc='lower right', fontsize=8)
     plt.tight_layout()
-    plt.savefig('/mnt/user-data/outputs/plot3_conversion_profile.png', dpi=150,
+    plt.savefig(out('plot3_conversion_profile.png'), dpi=150,
                 bbox_inches='tight', facecolor='#0f1117')
     plt.close()
     print("  ✓ Plot 3 saved: Conversion Profile")
@@ -190,7 +221,7 @@ def plot_ratio_effect():
                           edgecolor='#2e3650', alpha=0.8))
 
     plt.tight_layout()
-    plt.savefig('/mnt/user-data/outputs/plot4_ratio_effect.png', dpi=150,
+    plt.savefig(out('plot4_ratio_effect.png'), dpi=150,
                 bbox_inches='tight', facecolor='#0f1117')
     plt.close()
     print("  ✓ Plot 4 saved: H₂/N₂ Ratio Effect")
@@ -227,7 +258,7 @@ def plot_equilibrium():
     ax.set_ylim(0, 100)
     ax.legend()
     plt.tight_layout()
-    plt.savefig('/mnt/user-data/outputs/plot5_equilibrium.png', dpi=150,
+    plt.savefig(out('plot5_equilibrium.png'), dpi=150,
                 bbox_inches='tight', facecolor='#0f1117')
     plt.close()
     print("  ✓ Plot 5 saved: Equilibrium Conversion")
@@ -248,12 +279,13 @@ def plot_dashboard():
                  'Temkin–Dyson–Simon Rate Equation | P = 90 bar',
                  fontsize=13, fontweight='bold', color='#e8edf5', y=0.97)
 
-    # ── Panel A: Arrhenius ──
+    # ── Panel A: Arrhenius (log y-axis) ──
     ax = axes[0]
     k_vals = arrhenius(T_RANGE)
     ax.semilogy(T_RANGE, k_vals, color=ACCENT, linewidth=2)
     ax.fill_between(T_RANGE, k_vals * 0.001, k_vals, alpha=0.1, color=ACCENT)
-    style_ax(ax, 'A)  Rate Constant k vs T (Arrhenius)', 'T (K)', 'k (kmol/m³/h)')
+    # log_y=True — avoids AutoMinorLocator warning on log scale
+    style_ax(ax, 'A)  Rate Constant k vs T (Arrhenius)', 'T (K)', 'k (kmol/m³/h)', log_y=True)
 
     # ── Panel B: Rate vs Temperature ──
     ax = axes[1]
@@ -290,7 +322,7 @@ def plot_dashboard():
              'Catalyst W (kg)', 'X_N₂ (%)')
     ax.legend(fontsize=8)
 
-    plt.savefig('/mnt/user-data/outputs/plot6_dashboard.png', dpi=150,
+    plt.savefig(out('plot6_dashboard.png'), dpi=150,
                 bbox_inches='tight', facecolor='#0f1117')
     plt.close()
     print("  ✓ Plot 6 saved: Full Dashboard")
@@ -301,11 +333,12 @@ def plot_dashboard():
 # ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("\n Generating all plots...\n")
+    print(f"\n Generating all plots...\n")
+    print(f" Saving to: {OUTPUT_DIR}\n")
     plot_arrhenius()
     plot_rate_vs_temp()
     plot_conversion_profile()
     plot_ratio_effect()
     plot_equilibrium()
     plot_dashboard()
-    print("\n All plots saved to outputs folder.")
+    print(f"\n All plots saved to: {OUTPUT_DIR}")

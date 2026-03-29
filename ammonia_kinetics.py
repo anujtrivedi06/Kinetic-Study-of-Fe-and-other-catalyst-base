@@ -2,7 +2,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 R        = 8.314          # Universal gas constant, J/mol·K
-k0       = 6.5e13         # Pre-exponential factor, kmol/m³/h
+k0_forward       = 6.5e13         # Pre-exponential factor, kmol/m³/h
+k0_reverse      = 6.5e13         # Pre-exponential factor, kmol/m³/h
 Ea       = 159400         # Activation energy, J/mol (159.4 kJ/mol)
 alpha    = 0.654          # Temkin parameter
 P_bar    = 90.0           # Operating pressure, bar
@@ -10,13 +11,13 @@ P_Pa     = P_bar * 1e5    # Pressure in Pascals
 
 
 # STEP 1 — ARRHENIUS: Rate constant vs Temperature
-def arrhenius(T):
+def arrhenius(T, k):
     """
     Returns the rate constant k at temperature T (K).
     k = k0 * exp(-Ea / RT)
     Units: kmol/m³/h
     """
-    return k0 * np.exp(-Ea / (R * T))
+    return k * np.exp(-Ea / (R * T))
 
 # STEP 2 — TEMKIN RATE EQUATION
 def temkin_rate(T, y_N2, y_H2, y_NH3, P=P_bar):
@@ -28,7 +29,8 @@ def temkin_rate(T, y_N2, y_H2, y_NH3, P=P_bar):
     Activities approximated as partial pressures (Pi = yi * P).
     Returns rate in kmol/m³/h.
     """
-    k = arrhenius(T)
+    k_forward = arrhenius(T, k0_forward)
+    k_reverse = arrhenius(T, k0_reverse)
 
     # Partial pressures (bar)
     P_N2  = y_N2  * P
@@ -40,8 +42,8 @@ def temkin_rate(T, y_N2, y_H2, y_NH3, P=P_bar):
     P_H2  = max(P_H2,  1e-12)
     P_NH3 = max(P_NH3, 1e-12)
 
-    forward = k * ((P_N2 * P_H2**3) / P_NH3**2) ** alpha
-    reverse = k * ((P_NH3**2)       / P_H2**3)   ** (1 - alpha)
+    forward = k_forward * ((P_N2 * P_H2**3) / P_NH3**2) ** alpha
+    reverse = k_reverse * ((P_NH3**2)       / P_H2**3)   ** (1 - alpha)
 
     return forward - reverse   # net rate
 
@@ -179,10 +181,12 @@ def equilibrium_conversion(T, P=P_bar, ratio_H2_N2=3.0):
 
 if __name__ == "__main__":
     T_test = 673  
-    k_test = arrhenius(T_test)
+    k_test_forward = arrhenius(T_test, k0_forward)
+    k_test_backward = arrhenius(T_test, k0_reverse)
     r_test = temkin_rate(T_test, 0.25, 0.75, 0.01)
     print(f"T = {T_test} K")
-    print(f"k = {k_test:.4e} kmol/m³/h")
+    print(f"k_forward = {k_test_forward:.4e} kmol/m³/h")
+    print(f"k_backward = {k_test_backward:.4e} kmol/m³/h")
     print(f"r = {r_test:.4e} kmol/m³/h")
 
     W, X, _ = simulate_reactor(T_test)
